@@ -1,0 +1,165 @@
+---
+title: "M05-Visualizing Data with Tables"
+author: "Tim Arana"
+date: "june 25, 2026"
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    number-sections: true
+    code-link: true
+    code-tools: true
+    embed-resources: true
+    theme: cosmo
+editor: visual
+execute:
+  freeze: auto
+  warning: false
+  message: false
+---
+
+# Introduction
+
+This report summarizes what I learned about creating professional tables in R using the `gt` and `gtExtras` packages. The assignment also demonstrates how tables can communicate important information clearly while complementing charts in reports and presentations.
+
+::: callout-note
+This report includes reflections on the videos and a customized table created using the synthetic marketing dataset.
+:::
+
+# Reflection on Table Visualization
+
+## Prompt: Summarize what you learned from the videos you watched.
+
+I learned that the gt package makes it easy to create clean, professional-looking tables in R. The videos demonstrated how tables can be customized with titles, subtitles, labels, colors, formatting, and footnotes. I also learned that the gtExtras package extends these features by adding small visualizations inside tables, making them more informative. Overall, the videos showed that tables can be used as an effective way to communicate data, not just display numbers.
+
+## Prompt: What did you like about the gt and gtExtra packages demonstrated in the videos?
+
+I liked that the packages make tables look polished without requiring a lot of manual formatting. Features like color gradients, currency formatting, and small charts make tables easier to read and help important values stand out.I also liked that most of the formatting can be added with just a few functions which makes it easier to create professional reports.
+
+## Prompt: How do tables complement charts for data visualization?
+
+Tables and charts serve different purposes. Charts help people quickly identify trends and patterns, while tables provide the exact values behind those trends. Using both together gives readers a better understanding of the data. A chart can capture attention, while a table provides the detailed information needed to support decisions.
+
+## Prompt: Under what circumstances would you prefer to use tables rather than charts to visualize data?
+
+I would use tables when readers need exact numbers instead of general trends. Tables work well for presenting summary statistics, financial information, rankings, or comparisons where precise values are important. They are also useful when an audience may need to reference specific values later instead of only viewing a visual summary.  In business reports, I think tables are especially helpful because they provide the detailed information needed to support decisions.
+
+# Synthetic Marketing Data
+
+```{r}
+library(tidyverse)
+library(gt)
+library(gtExtras)
+
+set.seed(123)
+n <- 3000
+
+mail_data <- tibble(
+  customer_id = paste0("C", str_pad(1:n, 5, pad = "0")),
+  age = round(rnorm(n, mean = 45, sd = 12)),
+  income = round(rlnorm(n, meanlog = 10.8, sdlog = 0.6)),
+  recency_days = round(rexp(n, rate = 1 / 60)),
+  freq_12mo = rpois(n, lambda = 3),
+  avg_order_amt = round(rlnorm(n, meanlog = 4.2, sdlog = 0.5), 2),
+  channel = sample(
+    c("email", "direct_mail", "digital"),
+    n,
+    replace = TRUE,
+    prob = c(0.5, 0.3, 0.2)
+  ),
+  region = sample(
+    c("West", "South", "Midwest", "Northeast"),
+    n,
+    replace = TRUE
+  ),
+  loyalty_tier = sample(
+    c("Bronze", "Silver", "Gold", "Platinum"),
+    n,
+    replace = TRUE,
+    prob = c(0.4, 0.3, 0.2, 0.1)
+  ),
+  responded = rbinom(
+    n,
+    1,
+    prob = plogis(
+      -3 +
+        0.02 * (age - 45) +
+        0.3 * log(income / 50000) +
+        0.1 * freq_12mo -
+        0.005 * recency_days
+    )
+  )
+) |>
+  mutate(
+    income = if_else(runif(n) < 0.08, NA_real_, income),
+    avg_order_amt = if_else(runif(n) < 0.05, NA_real_, avg_order_amt),
+    responded = factor(responded, levels = c(1, 0), labels = c("yes", "no"))
+  )
+```
+# Table Created with gt and gtExtras
+
+```{r}
+table_data <-
+  mail_data |>
+  group_by(loyalty_tier) |>
+  summarise(
+    Avg_Income = mean(income, na.rm = TRUE),
+    Avg_Order = mean(avg_order_amt, na.rm = TRUE),
+    Avg_Purchases = mean(freq_12mo),
+    Avg_Recency = mean(recency_days),
+    .groups = "drop"
+  )
+```
+
+```{r}
+table_data |>
+  gt(rowname_col = "loyalty_tier") |>
+  tab_header(
+    title = md("**Customer Summary by Loyalty Tier**"),
+    subtitle = "Synthetic direct-mail marketing data"
+  ) |>
+  tab_stubhead(label = "Loyalty Tier") |>
+  tab_spanner(
+    label = "Customer Value Measures",
+    columns = c(Avg_Income, Avg_Order)
+  ) |>
+  tab_spanner(
+    label = "Behavior Measures",
+    columns = c(Avg_Purchases, Avg_Recency)
+  ) |>
+  cols_label(
+    Avg_Income = "Average Income",
+    Avg_Order = "Average Order Amount",
+    Avg_Purchases = "Avg. Purchases",
+    Avg_Recency = "Avg. Recency Days"
+  ) |>
+  fmt_currency(
+    columns = c(Avg_Income, Avg_Order),
+    decimals = 2
+  ) |>
+  fmt_number(
+    columns = c(Avg_Purchases, Avg_Recency),
+    decimals = 2
+  ) |>
+  data_color(
+    columns = Avg_Income
+  ) |>
+  gt_plt_bar(
+    column = Avg_Purchases,
+    scaled = TRUE
+  ) |>
+  tab_footnote(
+    footnote = "Average income excludes missing income values.",
+    locations = cells_column_labels(columns = Avg_Income)
+  ) |>
+  tab_source_note(
+    source_note = "Source: Synthetic direct-mail marketing dataset used for class practice."
+  ) |>
+  opt_table_font(
+    font = list(google_font("Roboto"), default_fonts())
+  )
+```
+
+## Prompt: Explain why the table is worth adding to your MSDM project written report or presentation slides.
+
+This table would be useful in an MSDM project report or presentation because it summarizes customer value and behavior by loyalty tier in one place. Instead of only showing a chart, the table provides the exact numbers for income, average order amount, purchases, and recency, making it easier to compare customer groups. The formatting and color also help highlight differences between loyalty tiers, allowing readers to quickly identify which customer segments appear to be more valuable for marketing decisions.
